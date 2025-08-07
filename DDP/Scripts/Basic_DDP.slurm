@@ -6,10 +6,10 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:2
 #SBATCH --partition=sgpu_devel
-#SBATCH --time=00:10:00
+#SBATCH --time=00:20:00
 
 ## Activate environment
-##conda deactivate
+conda deactivate
 source venv_ddp/bin/activate
 
 ## Run the training

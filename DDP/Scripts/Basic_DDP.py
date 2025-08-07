@@ -10,7 +10,7 @@ import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 
-# setup and cleanup of hardware
+# setup DDP environment (Adress and Port)
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
@@ -20,26 +20,26 @@ def cleanup():
     dist.destroy_process_group()
 
 
-# Model - define and setup
+# Create a Toy Model
 class ToyModel(nn.Module):
     def __init__(self):
         super(ToyModel, self).__init__()
-        self.net1 = nn.Linear(10, 10)
-        self.relu = nn.ReLU()
-        self.net2 = nn.Linear(10, 5)
+        self.net1 = nn.Linear(10, 10) # Layer 1 :
+        self.relu = nn.ReLU() # Activation
+        self.net2 = nn.Linear(10, 5) # Output
 
     def forward(self, x):
         return self.net2(self.relu(self.net1(x)))
-    
-    
+
+
 
 # Train the model (on multiple GPUs)
-## Demo training function
+
 def demo_basic(rank, world_size):
     # setup environment variables (Address port and process group)
-    print(f"Running basic DDP example on rank {rank}.")
-    setup(rank, world_size)
-    
+#    print(f"Running basic DDP example on rank {rank}.")
+#    setup(rank, world_size)
+
     # alternate way to setup environment ()
     torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
     dist.init_process_group("nccl")
@@ -48,8 +48,8 @@ def demo_basic(rank, world_size):
 
 
     # instantiate the model - and allocate a GPU
-    model = ToyModel().to(rank)
-    ddp_model = DDP(model, device_ids=[rank]) # instantiate the model for distributed data on GPU 
+    model = ToyModel().to(rank) # A copy of the model will be allocated to one GPU
+    ddp_model = DDP(model, device_ids=[rank]) # instantiate the model for distributed data on GPU
 
     # define loss and optimizer
     loss_fn = nn.MSELoss()
@@ -57,11 +57,14 @@ def demo_basic(rank, world_size):
 
     # Execute the training
     optimizer.zero_grad()
-    outputs = ddp_model(torch.randn(20, 10))
-    labels = torch.randn(20, 5).to(rank)
+    inputs = torch.randn(20,10)
+    outputs = ddp_model(inputs)
+
+    labels = torch.randn(20, 5).to(rank) # labels allocated to the corresponding GPUs
     loss = loss_fn(outputs, labels)
     loss.backward()
     optimizer.step()
+    print("Loss : ", loss)
 
     cleanup()
     print(f"Finished running basic DDP example on rank {rank}.")
@@ -72,7 +75,5 @@ if __name__ == "__main__":
     n_gpus = torch.cuda.device_count()
     assert n_gpus >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
     world_size = n_gpus
-    mp.spawn(demo_basic,
-             args=(world_size,),
-             nprocs=world_size,
-             join=True)
+    mp.spawn(demo_basic,args=(world_size,),nprocs=world_size,join=True) # On each of the available GPUs, the process will be spawned
+
