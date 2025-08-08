@@ -13,6 +13,6 @@ conda deactivate
 source venv_ddp/bin/activate
 
 ## Run the training
-##python Scripts/Basic_DDP.py
+python Scripts/Basic_DDP.py
 ##python Scripts/MNIST.py
-python Scripts/MiniGPT.py
+##python Scripts/MiniGPT.py

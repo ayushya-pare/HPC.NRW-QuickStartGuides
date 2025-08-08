@@ -37,14 +37,9 @@ class ToyModel(nn.Module):
 
 def demo_basic(rank, world_size):
     # setup environment variables (Address port and process group)
-#    print(f"Running basic DDP example on rank {rank}.")
-#    setup(rank, world_size)
-
-    # alternate way to setup environment ()
-    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-    dist.init_process_group("nccl")
-    rank = dist.get_rank()
     print(f"Running basic DDP example on rank {rank}.")
+    setup(rank, world_size)
+
 
 
     # instantiate the model - and allocate a GPU
@@ -55,18 +50,18 @@ def demo_basic(rank, world_size):
     loss_fn = nn.MSELoss()
     optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
 
-    # Execute the training
-    optimizer.zero_grad()
-    inputs = torch.randn(20,10)
-    outputs = ddp_model(inputs)
+    for epoch in range(10):
+        optimizer.zero_grad()
+        inputs = torch.randn(20,10)
+        outputs = ddp_model(inputs)
 
-    labels = torch.randn(20, 5).to(rank) # labels allocated to the corresponding GPUs
-    loss = loss_fn(outputs, labels)
-    loss.backward()
-    optimizer.step()
-    print("Loss : ", loss)
+        labels = torch.randn(20, 5).to(rank) # labels allocated to the corresponding GPUs
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        print("Epoch : ", epoch, "Loss : ", loss)
 
-    cleanup()
+    cleanup()	
     print(f"Finished running basic DDP example on rank {rank}.")
 
 
