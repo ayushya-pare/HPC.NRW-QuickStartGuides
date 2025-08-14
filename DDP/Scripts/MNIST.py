@@ -1,5 +1,5 @@
-# Imports
-import os
+# MNIST_DDP.py  — uses mp.spawn(..., args=(world_size,), ...) as requested
+import os, time
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -8,6 +8,20 @@ import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torchvision import datasets, transforms
 
+# ---------- Device header ----------
+def print_device_header(rank, world_size):
+    if rank == 0:
+        if torch.cuda.is_available():
+            n = torch.cuda.device_count()
+            print(f"[Device] Detected {n} CUDA device(s):")
+            for i in range(n):
+                print(f"  - cuda:{i}: {torch.cuda.get_device_name(i)}")
+            used = ", ".join([f"cuda:{i}" for i in range(min(world_size, n))])
+            print(f"[Device] Using {used}")
+        else:
+            print("[Device] CUDA not available — using CPU")
+
+# ---------- DDP setup / teardown ----------
 # Setup Port and address environment
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -16,15 +30,9 @@ def setup(rank, world_size):
 
 def cleanup():
     dist.destroy_process_group()
-
-def gpu_info(rank):
-    idx = torch.cuda.current_device()
-    name = torch.cuda.get_device_name(idx)
-    print(f"[DDP] Rank {rank} using GPU {idx}: {name}")
-
     
 
-#CNN for FashionMNIST
+# ---------- Model ----------
 class CNN_MNIST(nn.Module):
     def __init__(self):
         super().__init__()
@@ -36,60 +44,104 @@ class CNN_MNIST(nn.Module):
         self.fc2 = nn.Linear(128, 10)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = nn.functional.relu(x)
-        x = self.conv2(x)
-        x = nn.functional.relu(x)
+        x = nn.functional.relu(self.conv1(x))
+        x = nn.functional.relu(self.conv2(x))
         x = nn.functional.max_pool2d(x, 2)
         x = self.dropout1(x)
         x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = nn.functional.relu(x)
+        x = nn.functional.relu(self.fc1(x))
         x = self.dropout2(x)
         x = self.fc2(x)
         return x
 
-# Training loop
-def train_mnist(rank, world_size, epochs=5):
+# ---------- Training (per-rank) ----------
+def train_mnist(rank, world_size, epochs=5, batch_size=64):
     setup(rank, world_size)
-    gpu_info(rank)
     torch.manual_seed(0)
-    batch_size = 64
+    torch.backends.cudnn.benchmark = True
+
+    if rank == 0:
+        print_device_header(rank, world_size)
+
+    device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 
     transform = transforms.Compose([transforms.ToTensor()])
-    dataset = datasets.FashionMNIST('.', download=True, train=True, transform=transform)
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset, num_replicas=world_size, rank=rank)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=sampler)
+    # Download only on rank 0 to avoid races
+    if rank == 0:
+        datasets.FashionMNIST('.', download=True, train=True, transform=transform)
+    try:
+        dist.barrier(device_ids=[rank])  # quiets NCCL warnings on newer PyTorch
+    except TypeError:
+        dist.barrier()
 
-    model = CNN_MNIST().to(rank)
-    ddp_model = DDP(model, device_ids=[rank])
-    optimizer = optim.Adam(ddp_model.parameters(), lr=0.001)
+    dataset = datasets.FashionMNIST('.', download=False, train=True, transform=transform)
+    sampler = torch.utils.data.distributed.DistributedSampler(
+        dataset, num_replicas=world_size, rank=rank, shuffle=True
+    )
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        sampler=sampler,
+        num_workers=4,
+        pin_memory=True
+    )
+
+    model = CNN_MNIST().to(device)
+    ddp_model = DDP(model, device_ids=[rank], output_device=rank)
+    optimizer = optim.Adam(ddp_model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()
 
-    for epoch in range(epochs):
+    for epoch in range(1, epochs + 1):
         ddp_model.train()
         sampler.set_epoch(epoch)
-        epoch_loss = 0.0
-        for batch_idx, (data, target) in enumerate(dataloader):
-            data, target = data.to(rank), target.to(rank)
-            optimizer.zero_grad()
-            output = ddp_model(data)
-            loss = criterion(output, target)
+
+        start = time.time()
+        total_local = 0
+        loss_sum_local = 0.0
+        correct_local = 0
+
+        for xb, yb in loader:
+            xb = xb.to(device, non_blocking=True)
+            yb = yb.to(device, non_blocking=True)
+
+            optimizer.zero_grad(set_to_none=True)
+            logits = ddp_model(xb)
+            loss = criterion(logits, yb)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item()
-            if batch_idx % 100 == 0 and rank == 0:
-                print(f"Epoch {epoch}, Batch {batch_idx}, Loss {loss.item()}")
-        if rank == 0:
-            print(f"Epoch {epoch}, Avg Loss: {epoch_loss/len(dataloader)}")
-    cleanup()
-    
 
-    
-# Main function call
+            bsz = xb.size(0)
+            total_local    += bsz
+            loss_sum_local += loss.item() * bsz
+            correct_local  += (logits.argmax(1) == yb).sum().item()
+
+        # epoch time = max across ranks
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(device)
+        epoch_time_local = torch.tensor([time.time() - start], dtype=torch.float32, device=device)
+
+        # Reduce metrics (SUM) and time (MAX)
+        t_total = torch.tensor([total_local], dtype=torch.long, device=device)
+        t_loss  = torch.tensor([loss_sum_local], dtype=torch.float32, device=device)
+        t_corr  = torch.tensor([correct_local], dtype=torch.long, device=device)
+
+        dist.all_reduce(t_total, op=dist.ReduceOp.SUM)
+        dist.all_reduce(t_loss,  op=dist.ReduceOp.SUM)
+        dist.all_reduce(t_corr,  op=dist.ReduceOp.SUM)
+        dist.all_reduce(epoch_time_local, op=dist.ReduceOp.MAX)
+
+        if rank == 0:
+            total_all = t_total.item()
+            avg_loss  = t_loss.item() / total_all
+            acc       = t_corr.item() / total_all
+            t_epoch   = epoch_time_local.item()
+            print(f"Epoch {epoch:02d}/{epochs} | loss: {avg_loss:.4f} | acc: {acc:.4f} | time: {t_epoch:.2f}s")
+
+    cleanup()
+
+# ---------- Main (your requested form) ----------
 if __name__ == "__main__":
-    n_gpus = torch.cuda.device_count() 
+    n_gpus = torch.cuda.device_count()
     assert n_gpus >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
     world_size = n_gpus
     mp.spawn(train_mnist, args=(world_size,), nprocs=world_size, join=True)
-    
