@@ -11,6 +11,7 @@ def get_device():
         current = torch.cuda.current_device()
         print(f"Detected {count} CUDA device(s):")
         print(f"Using cuda:{current}")
+
         return torch.device(f"cuda:{current}")
     else:
         print("[Device] CUDA not available — using CPU")
@@ -47,6 +48,7 @@ def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
     loader = torch.utils.data.DataLoader(ds, batch_size=batch_size, shuffle=True,
                                         num_workers=num_workers, pin_memory=torch.cuda.is_available())
 
+
     model = CNN_MNIST().to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()
@@ -54,6 +56,7 @@ def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
     for epoch in range(1, epochs + 1):
         model.train()
         
+
         start = time.time()
 
         total = 0
@@ -64,6 +67,7 @@ def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
             xb, yb = xb.to(device), yb.to(device)
 
             optimizer.zero_grad()
+
             logits = model(xb)
             loss = criterion(logits, yb)
             loss.backward()
@@ -73,6 +77,7 @@ def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
             total    += n
             loss_sum += loss.item() * n
             correct  += (logits.argmax(1) == yb).sum().item()
+
 
         if torch.cuda.is_available():
             torch.cuda.synchronize(device)

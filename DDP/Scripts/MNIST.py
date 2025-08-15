@@ -1,3 +1,4 @@
+
 import os, time
 import torch
 import torch.distributed as dist
@@ -19,6 +20,7 @@ def get_device(rank, world_size):
             for i in range(n):
                 print(f"  - cuda:{i}: {torch.cuda.get_device_name(i)}")
             torch.cuda.set_device(rank)
+
         else:
             print("[Device] CUDA not available — using CPU")
 
@@ -78,6 +80,7 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
     )
 
     device = torch.device(f"cuda:{rank}")
+
     model = CNN_MNIST().to(device)
     ddp_model = DDP(model, device_ids=[rank], output_device=rank)
     optimizer = optim.Adam(ddp_model.parameters(), lr=1e-3)
@@ -108,6 +111,7 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
             n = xb.size(0)
             total_local    += n
             loss_sum_local += loss.item() * n
+
             correct_local  += (logits.argmax(1) == yb).sum().item()
 
         # epoch time = max across ranks
@@ -121,10 +125,12 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
             avg_loss = loss_sum_local / total_local
             acc = correct_local / total_local
             print(f"Epoch {epoch:02d}/{epochs} | loss: {avg_loss:.4f} | acc: {acc:.4f} | time: {epoch_time:.2f}s")
+
     cleanup()
 
 # ---------- Main (your requested form) ----------
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
-    assert world_size >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
+    assert world_size >= 2, f"Requires at least 2 GPUs to run, but got {world_size}"
+
     mp.spawn(train_mnist, args=(world_size,), nprocs=world_size, join=True)
