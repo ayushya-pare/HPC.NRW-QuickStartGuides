@@ -8,16 +8,15 @@ from torchvision import datasets, transforms
 def get_device():
     if torch.cuda.is_available():
         count = torch.cuda.device_count()
-        names = [torch.cuda.get_device_name(i) for i in range(count)]
         current = torch.cuda.current_device()
-        print(f"[Device] Detected {count} CUDA device(s):")
-        for i, n in enumerate(names):
-            print(f"  - cuda:{i}: {n}")
-        print(f"[Device] Using cuda:{current}")
+        print(f"Detected {count} CUDA device(s):")
+        print(f"Using cuda:{current}")
         return torch.device(f"cuda:{current}")
     else:
         print("[Device] CUDA not available — using CPU")
         return torch.device("cpu")
+
+# ---------- Model ----------
 
 class CNN_MNIST(nn.Module):
     def __init__(self):
@@ -41,19 +40,12 @@ class CNN_MNIST(nn.Module):
         return x
 
 def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
-    torch.manual_seed(0)
-    torch.backends.cudnn.benchmark = True
     device = get_device()
-
-    transform = transforms.Compose([transforms.ToTensor()])
-    dataset = datasets.FashionMNIST('.', download=True, train=True, transform=transform)
-    loader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available()
-    )
+    torch.manual_seed(0)
+    
+    ds = datasets.FashionMNIST('./Data', train=True, download=False, transform=transforms.ToTensor())
+    loader = torch.utils.data.DataLoader(ds, batch_size=batch_size, shuffle=True,
+                                        num_workers=num_workers, pin_memory=torch.cuda.is_available())
 
     model = CNN_MNIST().to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
@@ -61,6 +53,7 @@ def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
 
     for epoch in range(1, epochs + 1):
         model.train()
+        
         start = time.time()
 
         total = 0
@@ -68,18 +61,18 @@ def train_mnist(epochs: int = 5, batch_size: int = 64, num_workers: int = 4):
         correct = 0
 
         for xb, yb in loader:
-            xb = xb.to(device, non_blocking=True)
-            yb = yb.to(device, non_blocking=True)
-            optimizer.zero_grad(set_to_none=True)
+            xb, yb = xb.to(device), yb.to(device)
+
+            optimizer.zero_grad()
             logits = model(xb)
             loss = criterion(logits, yb)
             loss.backward()
             optimizer.step()
 
-            bsz = xb.size(0)
-            total      += bsz
-            loss_sum   += loss.item() * bsz
-            correct    += (logits.argmax(1) == yb).sum().item()
+            n = yb.size(0)
+            total    += n
+            loss_sum += loss.item() * n
+            correct  += (logits.argmax(1) == yb).sum().item()
 
         if torch.cuda.is_available():
             torch.cuda.synchronize(device)
