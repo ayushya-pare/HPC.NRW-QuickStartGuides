@@ -12,16 +12,14 @@ In this guide, we implement DDP to train a CNN model on FashionMNIST. This guide
 
 The torch.distributed package provides collective communication primitives that make multi-GPU training possible. In DDP, each GPU (or process) runs a full copy of the model, computes local gradients, and synchronizes them with the other processes. This synchronization happens during the backward pass through autograd hooks, which ensures that every process ends up with the same gradients. The result is consistent gradients across all processes, leading to a correct global model update.
 
-Your working repository may look like this:
+The repository structure looks like this:
 
 ```
 HPC-DDP-Tutorial/
 │── Scripts/
-│   ├── MNIST_wo_DDP.py   # single GPU baseline
 │   ├── MNIST.py          # DDP-enabled version
 │   └── model.py          # CNN_MNIST class
 │
-│── run_single.slurm      # SLURM script for single GPU
 │── run_ddp.slurm         # SLURM script for multi-GPU DDP
 │── requirements.txt
 │── Data/                 # FashionMNIST dataset (pre-downloaded)
@@ -86,11 +84,11 @@ def cleanup():
     dist.destroy_process_group()
 ```
 
-> ✅ Use `"nccl"` backend for GPU clusters.
+> Use `"nccl"` backend for GPU clusters.
 
 ---
 
-## Step 3. Define CNN
+## Step 3. Define CNN Model
 
 ```python
 class CNN_MNIST(nn.Module):
@@ -202,9 +200,9 @@ if __name__ == "__main__":
 #SBATCH --job-name=ddp-fmnist
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=12
-#SBATCH --gres=gpu:4
-#SBATCH --partition=develbooster
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:2
+#SBATCH --partition=develbooster # (depends on your cluster)
 #SBATCH --time=00:20:00
 #SBATCH --output=logs_ddp_%j.out
 
@@ -215,8 +213,6 @@ python Scripts/MNIST.py
 ---
 
 ## Notes
-
-* **CPU cores**: use `num_workers` efficiently. For example, 12 cores per task → split into 8 train + 3 valid + 1 main.
 * **torchrun**: modern alternative to `mp.spawn`. Example:
 
 ```bash
@@ -225,9 +221,5 @@ torchrun --nproc_per_node=4 Scripts/MNIST.py
 
 ---
 
-## Wrap-Up
-
-* DDP = **one process per GPU**.
-* Key additions: `init_process_group`, `DistributedSampler`, `DDP(model, ...)`.
-* Synchronization is automatic in `.backward()`.
-* HPC clusters (with SLURM) integrate seamlessly
+## Next-Up
+Scaling DDP to larger models like MiniGPT, combining DDP with model parallelism.
