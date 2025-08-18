@@ -15,7 +15,7 @@ The torch.distributed package provides collective communication primitives that 
 The repository structure looks like this:
 
 ```
-HPC-DDP-Tutorial/
+DDP/
 │── Scripts/
 │   ├── MNIST.py          # DDP-enabled version
 │   └── model.py          # CNN_MNIST class
