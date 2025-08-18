@@ -19,7 +19,7 @@ DDP/
 │── Scripts/
 │   ├── MNIST.py          # DDP-enabled version
 │   └── cnn_model.py          # CNN_MNIST class
-│   └── run_ddp.slurm         # SLURM script for multi-GPU DDP
+│   └── Basic_ddp.slurm         # SLURM script for multi-GPU DDP
 │── requirements.txt
 │── Data/                 # FashionMNIST dataset (pre-downloaded)
 │── logs/                 # Training logs
