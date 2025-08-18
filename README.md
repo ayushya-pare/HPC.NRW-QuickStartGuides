@@ -18,9 +18,8 @@ The repository structure looks like this:
 DDP/
 │── Scripts/
 │   ├── MNIST.py          # DDP-enabled version
-│   └── model.py          # CNN_MNIST class
-│
-│── run_ddp.slurm         # SLURM script for multi-GPU DDP
+│   └── cnn_model.py          # CNN_MNIST class
+│   └── run_ddp.slurm         # SLURM script for multi-GPU DDP
 │── requirements.txt
 │── Data/                 # FashionMNIST dataset (pre-downloaded)
 │── logs/                 # Training logs
