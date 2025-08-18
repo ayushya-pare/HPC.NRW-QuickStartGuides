@@ -9,6 +9,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+from cnn_model import CNN_MNIST
 
 # ---------- Device header ----------
             
@@ -35,38 +36,15 @@ def cleanup():
     dist.destroy_process_group()
     
 
-# ---------- Model ----------
-class CNN_MNIST(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
-        self.dropout1 = nn.Dropout(0.25)
-        self.dropout2 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(9216, 128)
-        self.fc2 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        x = nn.functional.relu(self.conv1(x))
-        x = nn.functional.relu(self.conv2(x))
-        x = nn.functional.max_pool2d(x, 2)
-        x = self.dropout1(x)
-        x = torch.flatten(x, 1)
-        x = nn.functional.relu(self.fc1(x))
-        x = self.dropout2(x)
-        x = self.fc2(x)
-        return x
-
 # ---------- Training (per-rank) ----------
 def train_mnist(rank, world_size, epochs=5, batch_size=64):
     device = get_device(rank, world_size)
     
     setup(rank, world_size)
     torch.manual_seed(0)
-#    torch.backends.cudnn.benchmark = True
 
     tfm = transforms.ToTensor()
-    root = "Data"  # parent of FashionMNIST/
+    root = "Data"  # Dataset is stored under FashionMNIST/*
 
     train_ds = datasets.FashionMNIST('./Data', train=True, download=False, transform=tfm)
     train_sampler = DistributedSampler(train_ds, num_replicas=world_size, rank=rank, shuffle=True)
@@ -118,7 +96,7 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
         if torch.cuda.is_available():
             torch.cuda.synchronize(device)
         dist.barrier(device_ids=[rank])
-        epoch_time = time.time() - start  # ~max across ranks due to barrier
+        epoch_time = time.time() - start  
 
         # rank-0 prints *its own shard* metrics (approximate global)
         if rank == 0:
@@ -128,7 +106,7 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
 
     cleanup()
 
-# ---------- Main (your requested form) ----------
+# ---------- Main ----------
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     assert world_size >= 2, f"Requires at least 2 GPUs to run, but got {world_size}"

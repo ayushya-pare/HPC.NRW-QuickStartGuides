@@ -1,5 +1,6 @@
 .DS_Store
 /DDP/logs/
-/DDP/Models/
+/DDP/Model/
 /DDP/venv_ddp/
 /DDP/Data/
+/DDP/Scripts/__pycache__
