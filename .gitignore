@@ -2,5 +2,5 @@
 /DDP/logs/
 /DDP/Model/
 /DDP/venv_ddp/
-/DDP/Data/
+#/DDP/Data/
 /DDP/Scripts/__pycache__
