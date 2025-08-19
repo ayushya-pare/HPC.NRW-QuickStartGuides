@@ -18,8 +18,8 @@ The repository structure looks like this:
 DDP/
 │── Scripts/
 │   ├── MNIST.py          # DDP-enabled version
-│   └── cnn_model.py          # CNN_MNIST class
-│   └── Basic_ddp.slurm         # SLURM script for multi-GPU DDP
+│   └── cnn_model.py      # CNN_MNIST class
+│   └── Basic_DDP.slurm   # SLURM script for multi-GPU DDP
 │── requirements.txt
 │── Data/                 # FashionMNIST dataset (pre-downloaded)
 │── logs/                 # Training logs
@@ -210,6 +210,10 @@ python Scripts/MNIST.py
 ```
 
 ---
+To make use of all the CPU cores on the system, we can enable parallel data processing by passing the --train-num-workers and --valid-num-workers arguments. These set the corresponding num_workers argument for the respective DataLoaders.
+It is often a good idea to use all available CPU cores except one, which is kept for the main process.
+In our example sbatch script, we select 8 CPU cores per task. Since we run with --ntasks-per-node=4, the total CPU cores per node are 4 × 8 = 32. With 2 GPUs allocated per node (--gres=gpu:2) and 4 tasks, we effectively assign 8 CPU cores per GPU/task.
+
 
 ## Notes
 * **torchrun**: modern alternative to `mp.spawn`. Example:
