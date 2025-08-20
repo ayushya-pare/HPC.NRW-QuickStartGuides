@@ -56,17 +56,36 @@ pip install -r requirements.txt
 2. Next, inside your HPC virtual environment:
 
 ```bash
-module load cuda/12.0 
+module load cuda/12.0 # Module names/versions vary by cluster — check module avail or your cluster docs
 python3 -m venv venv_ddp
 source venv_ddp/bin/activate
 pip install -r requirements.txt
 ```
-**Note:** Module names/versions vary by cluster—check module avail or your cluster docs
 
-### Submit the provided SLURM script
-```bash
-sbatch Scripts/Basic_DDP.slurm
-```
+### Run script 
+1. Prepare SLURM commands. Open ```Scripts/Basic_DDP.slurm``` and adjust the parameters.
+    ```bash
+    #!/bin/bash
+    #SBATCH --job-name=ddp-basic
+    #SBATCH --output=logs/ddp_%j.out
+    #SBATCH --error=logs/ddp_%j.err
+    #SBATCH --nodes=1
+    #SBATCH --ntasks-per-node=4
+    #SBATCH --cpus-per-task=8
+    #SBATCH --gres=gpu:2
+    #SBATCH --partition=sgpu_devel ## Check available partitions for your cluster 
+    #SBATCH --time=00:20:00
+    
+    ## Activate environment
+    source venv_ddp/bin/activate
+    
+    ## Run the training
+    python Scripts/MNIST.py
+    ```
+3. Submit the SLURM script
+    ```bash
+    sbatch Scripts/Basic_DDP.slurm
+    ```
 
 ### Monitor logs
 
