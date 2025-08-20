@@ -44,8 +44,8 @@ python3 -m venv venv_ddp
 source venv_ddp/bin/activate
 pip install -r requirements.txt
 ```
-
 ---
+Note: Module names/versions vary by cluster—check module avail or your cluster docs
 
 ## Step 1. Packages
 
@@ -71,7 +71,7 @@ Every DDP run needs:
 * `MASTER_ADDR`: address of the master node (localhost if single node).
 * `MASTER_PORT`: free port for process group.
 * `rank`: unique ID for this process (0 … world\_size-1).
-* `world_size`: total number of processes (GPUs).
+* `world_size`: total number of processes (GPUs across all nodes).
 
 ```python
 def setup(rank, world_size):
@@ -180,6 +180,8 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
 ```
 
 ---
+The dataset is already downloaded at ```Data/FashionMNIST/*```, keep ```download=False```.
+If downloading for the first time, set ```download=True``` once to fetch it automatically.
 
 ## Step 5. Main Block
 
@@ -191,6 +193,8 @@ if __name__ == "__main__":
 ```
 
 ---
+Note: World size = number of GPUs you requested per node × nodes
+  
 
 ## Step 6. SLURM Scripts
 
@@ -198,29 +202,53 @@ if __name__ == "__main__":
 #!/bin/bash
 #SBATCH --job-name=ddp-fmnist
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:2
-#SBATCH --partition=develbooster # (depends on your cluster)
+#SBATCH --partition=sgpu_devel # (depends on your cluster)
 #SBATCH --time=00:20:00
-#SBATCH --output=logs_ddp_%j.out
+#SBATCH --output=logs/%x_%j.out
 
+module load cuda/12.0                # (depends on your cluster)
+
+# Prepare environment
+python3 -m venv venv_ddp
 source venv_ddp/bin/activate
-python Scripts/MNIST.py
-```
+pip install -r requirements.txt
 
+# GPU utilization logging (background)
+# Try dmon first; fallback to nvidia-smi -l
+if command -v nvidia-smi >/dev/null 2>&1; then
+  if nvidia-smi dmon -h >/dev/null 2>&1; then
+    nvidia-smi dmon -s pucm -d 5 > logs/gpu_${SLURM_JOB_ID}_dmon.log 2>&1 &
+  else
+    nvidia-smi -l 5 > logs/gpu_${SLURM_JOB_ID}.log 2>&1 &
+  fi
+  GPULOG_PID=$!
+  trap "kill ${GPULOG_PID} 2>/dev/null || true" EXIT
+fi
+
+# Single-node defaults for DDP
+export MASTER_ADDR=localhost
+export MASTER_PORT=$(shuf -i 20000-65000 -n1)
+
+torchrun --standalone --nproc_per_node=2 Scripts/MNIST.py
+
+```
 ---
-To make use of all the CPU cores on the system, we can enable parallel data processing by passing the --train-num-workers and --valid-num-workers arguments. These set the corresponding num_workers argument for the respective DataLoaders.
-It is often a good idea to use all available CPU cores except one, which is kept for the main process.
-In our example sbatch script, we select 8 CPU cores per task. Since we run with --ntasks-per-node=4, the total CPU cores per node are 4 × 8 = 32. With 2 GPUs allocated per node (--gres=gpu:2) and 4 tasks, we effectively assign 8 CPU cores per GPU/task.
+Notes: Mapping rank to GPU
 
+Using ``` ddp_model = DDP(model, device_ids=[rank], output_device=rank)``` assumes global ```rank == local GPU id```.
 
-## Notes
-* **torchrun**: modern alternative to `mp.spawn`. Example:
+This is true for single-node when you spawn one process per GPU and ranks are 0..N-1.
+Multi-node caution: global rank 0 is not necessarily ```cuda:0``` on every node. Use ```local_rank``` (e.g., ```os.environ["LOCAL_RANK"]```) to select the device:
 
-```bash
-torchrun --nproc_per_node=4 Scripts/MNIST.py
+```python
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
+device = torch.device(f"cuda:{local_rank}")
+ddp_model = DDP(model.to(device), device_ids=[local_rank], output_device=local_rank)
 ```
+This is handled automatically when you launch with ```torchrun```.
 
 ---
 
