@@ -26,26 +26,53 @@ DDP/
 ```
 
 ---
+## Reproducing
 
-## Requirements and Installation
+This repository contains the source code used to train a CNN model on FashionMNIST using PyTorch’s **Distributed Data Parallel (DDP)**. The entire implementation is written in PyTorch, and we make use of auxiliary libraries such as **Torchvision** for dataset handling and transforms, and **SLURM** job scripts for execution on HPC clusters.
 
-**requirements.txt**
+All package requirements are listed in the `requirements.txt` file. The Python version used is **3.10+**.
 
-```txt
-torch>=2.0
-torchvision>=0.15
+Since our experiments were performed on the **Marvin HPC cluster** at the University of Bonn, which uses **SLURM** for job scheduling, all major training runs were launched via the provided **bash scripts**. Each bash script corresponds to its respective Python training script and can be found in the `/Scripts` folder.
+
+## Steps to Reproduce
+
+1. Clone this repository and set up a Python virtual environment.
+2. Install dependencies from `requirements.txt`.
+3. Submit the provided SLURM script (e.g., `Basic_DDP.slurm`) to your cluster.
+4. Logs for training output and GPU utilization will be saved automatically in the `/logs` directory.
+
+### Clone repository
+```bash
+git clone https://github.com/ayushya-pare/HPC-NRW-AP4-QuickStartGuides.git
+cd DDP
 ```
 
-Install inside your HPC virtual environment:
+### Install dependencies
+1. Install the dependencies from the ```requirements.txt``` file.
+```bash
+pip install -r requirements.txt
+```
+
+2. Next, inside your HPC virtual environment:
 
 ```bash
-module load cuda/12.0  # (depends on your cluster)
+module load cuda/12.0 
 python3 -m venv venv_ddp
 source venv_ddp/bin/activate
 pip install -r requirements.txt
 ```
----
-Note: Module names/versions vary by cluster—check module avail or your cluster docs
+**Note:** Module names/versions vary by cluster—check module avail or your cluster docs
+
+### Submit the provided SLURM script
+```bash
+sbatch Scripts/Basic_DDP.slurm
+```
+
+### Monitor logs
+
+- Training logs and metrics are saved in the ```logs/``` directory as ```logs/<jobname>_<jobid>.out```.
+- GPU utilization is recorded in ```logs/gpu_<jobid>.log```
+
 
 ## Step 1. Packages
 
