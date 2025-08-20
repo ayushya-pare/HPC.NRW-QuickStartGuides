@@ -46,19 +46,15 @@ cd HPC.NRW-QuickStartGuides/DDP
 ```
 
 ### Install dependencies
-1. Install the dependencies from the ```requirements.txt``` file.
-```bash
-pip install -r requirements.txt
-```
-
-2. Next, inside your HPC virtual environment:
+Install the dependencies from the ```requirements.txt``` file. Run the following commands inside your HPC virtual environment:
 
 ```bash
-module load cuda/12.0 # Module names/versions vary by cluster — check module avail or your cluster docs
+module load CUDA/12.6.0 
 python3 -m venv venv_ddp
 source venv_ddp/bin/activate
 pip install -r requirements.txt
 ```
+**Note**: # Module names/versions vary by cluster — check module avail or your cluster docs
 
 ### Run script 
 1. Prepare SLURM commands. Open ```Scripts/Basic_DDP.slurm``` and adjust the parameters.
@@ -88,7 +84,26 @@ pip install -r requirements.txt
 ### Monitor logs
 
 - Training logs and metrics are saved in the ```logs/``` directory as ```logs/<jobname>_<jobid>.out```.
+Inside you’ll see something like this:
+```yaml
+Epoch 01/5 | loss: 0.5332 | acc: 0.8124 | time: 8.51s
+Epoch 02/5 | loss: 0.4215 | acc: 0.8517 | time: 7.93s
+Epoch 03/5 | loss: 0.3752 | acc: 0.8675 | time: 7.88s
+Epoch 04/5 | loss: 0.3489 | acc: 0.8768 | time: 7.77s
+Epoch 05/5 | loss: 0.3311 | acc: 0.8829 | time: 7.80s
+```
+This confirms the DDP training loop is working correctly.
+
 - GPU utilization is recorded in ```logs/gpu_<jobid>.log```
+```yaml
+# gpu    pwr  gtemp  mtemp   sm   mem   enc   dec   mclk   pclk   fb
+0       63     32     47    72    54     0     0   1593    210   850
+1       64     35     51    70    57     0     0   1593    210   852
+```
+
+- sm = streaming multiprocessor utilization (% GPU compute load)
+- mem = GPU memory usage %
+
 
 ## Implementation with DDP
 The following sections show how the ```MNIST.py``` training script and the ```Basic_DDP.slurm``` job script were designed using PyTorch Distributed Data Parallel (DDP). The Python code sets up the model, communication, and training loop across multiple GPUs, while the SLURM script ensures correct execution on the HPC cluster with resource allocation and logging.
