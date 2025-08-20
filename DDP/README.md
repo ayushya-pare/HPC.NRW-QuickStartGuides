@@ -73,8 +73,10 @@ sbatch Scripts/Basic_DDP.slurm
 - Training logs and metrics are saved in the ```logs/``` directory as ```logs/<jobname>_<jobid>.out```.
 - GPU utilization is recorded in ```logs/gpu_<jobid>.log```
 
+## Implementation with DDP
+The following sections show how the ```MNIST.py``` training script and the ```Basic_DDP.slurm``` job script were designed using PyTorch Distributed Data Parallel (DDP). The Python code sets up the model, communication, and training loop across multiple GPUs, while the SLURM script ensures correct execution on the HPC cluster with resource allocation and logging.
 
-## Step 1. Packages
+### Step 1. Packages
 
 ```python
 import os, time
@@ -91,7 +93,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 ---
 
-## Step 2. Setup Communication
+### Step 2. Setup Communication
 
 Every DDP run needs:
 
@@ -114,7 +116,7 @@ def cleanup():
 
 ---
 
-## Step 3. Define CNN Model
+### Step 3. Define CNN Model
 
 ```python
 class CNN_MNIST(nn.Module):
@@ -141,7 +143,7 @@ class CNN_MNIST(nn.Module):
 
 ---
 
-## Step 4. Training Loop (Per Process/Rank)
+### Step 4. Training Loop (Per Process/Rank)
 
 Each process:
 
@@ -210,7 +212,7 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
 The dataset is already downloaded at ```Data/FashionMNIST/*```, keep ```download=False```.
 If downloading for the first time, set ```download=True``` once to fetch it automatically.
 
-## Step 5. Main Block
+### Step 5. Main Block
 
 ```python
 if __name__ == "__main__":
@@ -223,7 +225,7 @@ if __name__ == "__main__":
 Note: World size = number of GPUs you requested per node × nodes
   
 
-## Step 6. SLURM Scripts
+### Step 6. SLURM Scripts
 
 ```bash
 #!/bin/bash
@@ -259,7 +261,7 @@ fi
 export MASTER_ADDR=localhost
 export MASTER_PORT=$(shuf -i 20000-65000 -n1)
 
-torchrun --standalone --nproc_per_node=2 Scripts/MNIST.py
+python Scripts/MNIST.py
 
 ```
 ---
@@ -279,5 +281,5 @@ This is handled automatically when you launch with ```torchrun```.
 
 ---
 
-## Next-Up
+### Next-Up
 Scaling DDP to larger models like MiniGPT, combining DDP with model parallelism.
