@@ -1,5 +1,3 @@
-# HPC-NRW-AP4-QuickStartGuides
-
 ## Distributed Data Parallel (DDP) with PyTorch on HPC
 
 Distributed Data Parallel (DDP) is a powerful module in PyTorch that allows you to parallelize your model across multiple GPUs or even multiple machines, making it perfect for large-scale deep learning applications.
@@ -43,8 +41,8 @@ Since our experiments were performed on the **Marvin HPC cluster** at the Univer
 
 ### Clone repository
 ```bash
-git clone git@github.com:ayushya-pare/HPC-NRW-AP4-QuickStartGuides.git
-cd DDP
+git clone git@github.com:ayushya-pare/HPC.NRW-QuickStartGuides.git
+cd HPC.NRW-QuickStartGuides/DDP
 ```
 
 ### Install dependencies
@@ -302,3 +300,7 @@ This is handled automatically when you launch with ```torchrun```.
 
 ### Next-Up
 Scaling DDP to larger models like MiniGPT, combining DDP with model parallelism.
+
+--- 
+Author: Ayushya Pare (Research assistant, University of Bonn)
+
