@@ -43,7 +43,7 @@ Since our experiments were performed on the **Marvin HPC cluster** at the Univer
 
 ### Clone repository
 ```bash
-git clone https://github.com/ayushya-pare/HPC-NRW-AP4-QuickStartGuides.git
+git clone git@github.com:ayushya-pare/HPC-NRW-AP4-QuickStartGuides.git
 cd DDP
 ```
 
