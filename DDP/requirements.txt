@@ -1,9 +1,2 @@
-numpy
-pandas
-torch
-transformers
-datasets
-peft
-accelerate
-scikit-learn
-torchvision
+torch>=2.0
+torchvision>=0.15
