@@ -60,21 +60,18 @@ pip install -r requirements.txt
 1. Prepare SLURM commands. Open ```Scripts/Basic_DDP.slurm``` and adjust the parameters.
     ```bash
     #!/bin/bash
-    #SBATCH --job-name=ddp-basic
-    #SBATCH --output=logs/ddp_%j.out
-    #SBATCH --error=logs/ddp_%j.err
+    #SBATCH --job-name=ddp-fmnist
     #SBATCH --nodes=1
-    #SBATCH --ntasks-per-node=4
+    #SBATCH --ntasks-per-node=2
     #SBATCH --cpus-per-task=8
     #SBATCH --gres=gpu:2
-    #SBATCH --partition=sgpu_devel ## Check available partitions for your cluster 
+    #SBATCH --partition=sgpu_devel ## depends on your cluster
     #SBATCH --time=00:20:00
+    #SBATCH --output=logs/%x_%j.out
     
-    ## Activate environment
-    source venv_ddp/bin/activate
-    
-    ## Run the training
-    python Scripts/MNIST.py
+    . 
+    .
+    .
     ```
 3. Submit the SLURM script
     ```bash
@@ -85,21 +82,21 @@ pip install -r requirements.txt
 
 - Training logs and metrics are saved in the ```logs/``` directory as ```logs/<jobname>_<jobid>.out```.
 Inside you’ll see something like this:
-```yaml
-Epoch 01/5 | loss: 0.5332 | acc: 0.8124 | time: 8.51s
-Epoch 02/5 | loss: 0.4215 | acc: 0.8517 | time: 7.93s
-Epoch 03/5 | loss: 0.3752 | acc: 0.8675 | time: 7.88s
-Epoch 04/5 | loss: 0.3489 | acc: 0.8768 | time: 7.77s
-Epoch 05/5 | loss: 0.3311 | acc: 0.8829 | time: 7.80s
-```
+    ```yaml
+    Epoch 01/5 | loss: 0.5332 | acc: 0.8124 | time: 8.51s
+    Epoch 02/5 | loss: 0.4215 | acc: 0.8517 | time: 7.93s
+    Epoch 03/5 | loss: 0.3752 | acc: 0.8675 | time: 7.88s
+    Epoch 04/5 | loss: 0.3489 | acc: 0.8768 | time: 7.77s
+    Epoch 05/5 | loss: 0.3311 | acc: 0.8829 | time: 7.80s
+    ```
 This confirms the DDP training loop is working correctly.
 
-- GPU utilization is recorded in ```logs/gpu_<jobid>.log```
-```yaml
-# gpu    pwr  gtemp  mtemp   sm   mem   enc   dec   mclk   pclk   fb
-0       63     32     47    72    54     0     0   1593    210   850
-1       64     35     51    70    57     0     0   1593    210   852
-```
+- GPU utilization is recorded in ```logs/gpu_<jobid>.log```, which looks like this:
+    ```yaml
+    # gpu    pwr  gtemp  mtemp   sm   mem   enc   dec   mclk   pclk   fb
+    0       63     32     47    72    54     0     0   1593    210   850
+    1       64     35     51    70    57     0     0   1593    210   852
+    ```
 
 - sm = streaming multiprocessor utilization (% GPU compute load)
 - mem = GPU memory usage %
@@ -266,19 +263,11 @@ Note: World size = number of GPUs you requested per node × nodes
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:2
-#SBATCH --partition=sgpu_devel # (depends on your cluster)
+#SBATCH --partition=sgpu_devel ## depends on your cluster
 #SBATCH --time=00:20:00
 #SBATCH --output=logs/%x_%j.out
 
-module load cuda/12.0                # (depends on your cluster)
-
-# Prepare environment
-python3 -m venv venv_ddp
-source venv_ddp/bin/activate
-pip install -r requirements.txt
-
-# GPU utilization logging (background)
-# Try dmon first; fallback to nvidia-smi -l
+# GPU utilization logging
 if command -v nvidia-smi >/dev/null 2>&1; then
   if nvidia-smi dmon -h >/dev/null 2>&1; then
     nvidia-smi dmon -s pucm -d 5 > logs/gpu_${SLURM_JOB_ID}_dmon.log 2>&1 &
@@ -299,10 +288,9 @@ python Scripts/MNIST.py
 ---
 Notes: Mapping rank to GPU
 
-Using ``` ddp_model = DDP(model, device_ids=[rank], output_device=rank)``` assumes global ```rank == local GPU id```.
+Using ``` ddp_model = DDP(model, device_ids=[rank], output_device=rank)``` assumes global ```rank == local GPU id```. This is true for single-node when you spawn one process per GPU and ranks are 0..N-1.
 
-This is true for single-node when you spawn one process per GPU and ranks are 0..N-1.
-Multi-node caution: global rank 0 is not necessarily ```cuda:0``` on every node. Use ```local_rank``` (e.g., ```os.environ["LOCAL_RANK"]```) to select the device:
+**Multi-node caution**: global rank 0 is not necessarily ```cuda:0``` on every node. Use ```local_rank``` (e.g., ```os.environ["LOCAL_RANK"]```) to select the device:
 
 ```python
 local_rank = int(os.environ.get("LOCAL_RANK", 0))
