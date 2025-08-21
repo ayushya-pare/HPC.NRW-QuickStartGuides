@@ -5,6 +5,7 @@ import torch.distributed as dist
 import torch.nn as nn
 import torch.optim as optim
 import torch.multiprocessing as mp
+import socket
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
@@ -18,10 +19,15 @@ def get_device(rank, world_size):
         if torch.cuda.is_available():
             n = torch.cuda.device_count()
             print(f"[Device] Detected {n} CUDA device(s):")
+            
             for i in range(n):
-                print(f"  - cuda:{i}: {torch.cuda.get_device_name(i)}")
-            torch.cuda.set_device(rank)
-
+                device = torch.device(f"cuda:{rank}") 
+                torch.cuda.set_device(device)
+                gpu_name = torch.cuda.get_device_name(rank)
+                host = socket.gethostname()
+                print(f"cuda:{i}: {torch.cuda.get_device_name(i)} | "
+                      f"[host={host}] [rank={i}/{world_size-1}] [gpu={i}:{gpu_name}] " )
+            
         else:
             print("[Device] CUDA not available — using CPU")
 
@@ -29,7 +35,7 @@ def get_device(rank, world_size):
 # Setup Port and address environment
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '11111'
+    os.environ['MASTER_PORT'] = '12121'
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -37,7 +43,7 @@ def cleanup():
     
 
 # ---------- Training (per-rank) ----------
-def train_mnist(rank, world_size, epochs=5, batch_size=64):
+def train_mnist(rank, world_size, epochs=15, batch_size=64):
     device = get_device(rank, world_size)
     
     setup(rank, world_size)
@@ -95,14 +101,17 @@ def train_mnist(rank, world_size, epochs=5, batch_size=64):
         # epoch time = max across ranks
         if torch.cuda.is_available():
             torch.cuda.synchronize(device)
-        dist.barrier(device_ids=[rank])
+#        dist.barrier(device_ids=[rank])
         epoch_time = time.time() - start  
 
-        # rank-0 prints *its own shard* metrics (approximate global)
-        if rank == 0:
-            avg_loss = loss_sum_local / total_local
-            acc = correct_local / total_local
-            print(f"Epoch {epoch:02d}/{epochs} | loss: {avg_loss:.4f} | acc: {acc:.4f} | time: {epoch_time:.2f}s")
+        
+        avg_loss = loss_sum_local / total_local
+        acc = correct_local / total_local
+
+        print(f"[rank={rank}/{world_size-1}] [gpu={rank}] | "
+              f"Epoch {epoch:02d}/{epochs} | loss: {avg_loss:.4f} | acc: {acc:.4f} | time: {epoch_time:.2f}s",
+              flush=True 
+              )
 
     cleanup()
 
