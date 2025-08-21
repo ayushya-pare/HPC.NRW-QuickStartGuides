@@ -81,25 +81,37 @@ pip install -r requirements.txt
 ### Monitor logs
 
 - Training logs and metrics are saved in the ```logs/``` directory as ```logs/<jobname>_<jobid>.out```.
-Inside you’ll see something like this:
+    Inside you’ll see something like this:
     ```yaml
-    Epoch 01/5 | loss: 0.5332 | acc: 0.8124 | time: 8.51s
-    Epoch 02/5 | loss: 0.4215 | acc: 0.8517 | time: 7.93s
-    Epoch 03/5 | loss: 0.3752 | acc: 0.8675 | time: 7.88s
-    Epoch 04/5 | loss: 0.3489 | acc: 0.8768 | time: 7.77s
-    Epoch 05/5 | loss: 0.3311 | acc: 0.8829 | time: 7.80s
+    [Device] Detected 2 CUDA device(s):
+    cuda:0: NVIDIA A100-SXM4-80GB | [host=sgpu014]
+    cuda:1: NVIDIA A100-SXM4-80GB | [host=sgpu014]
     ```
-This confirms the DDP training loop is working correctly.
+
+    ```yaml
+    [rank=1/1] [gpu=1] | Epoch 01/15 | loss: 0.5573 | acc: 0.8029
+    [rank=0/1] [gpu=0] | Epoch 01/15 | loss: 0.5636 | acc: 0.7967
+    .
+    .
+    ```
+    The script sees 2 NVIDIA A100 GPUs (cuda:0 and cuda:1) on node sgpu014.
+    It assigns rank 0 → GPU 0 and rank 1 → GPU 1.The two processes (ranks) are working in parallel, with similar losses and accuracies, which confirms DDP is running correctly. Small differences in loss/accuracy per rank are expected because each GPU sees different data shards each epoch.
 
 - GPU utilization is recorded in ```logs/gpu_<jobid>.log```, which looks like this:
     ```yaml
-    # gpu    pwr  gtemp  mtemp   sm   mem   enc   dec   mclk   pclk   fb
-    0       63     32     47    72    54     0     0   1593    210   850
-    1       64     35     51    70    57     0     0   1593    210   852
+    # gpu    pwr  gtemp  mtemp     sm    mem    enc    dec    jpg    ofa   mclk   pclk     fb   bar1
+    # Idx      W      C      C      %      %      %      %      %      %    MHz    MHz     MB     MB
+        0     64     30     46      0      0      0      0      0      0   1593    210      4      1
+        1     61     28     44      0      0      0      0      0      0   1593    210      4      1
+        0     76     30     46      0      0      0      0      0      0   1593   1275    452      4
+        1     61     28     44      0      0      0      0      0      0   1593   1275     24      2
+        0     87     32     45      0      0      0      0      0      0   1593   1410    916      4
+    .
+    .
     ```
 
-- sm = streaming multiprocessor utilization (% GPU compute load)
-- mem = GPU memory usage %
+    GPU logs show how each GPU’s resources are being used over time — power, temperature, memory, and compute (SM) utilization.
+    They help verify whether GPUs are idle or fully engaged during training, and whether memory and power usage match expectations         for the workload.
 
 
 ## Implementation with DDP
