@@ -30,7 +30,7 @@ This repository contains the source code used to train a CNN model on FashionMNI
 
 All package requirements are listed in the `requirements.txt` file. The Python version used is **3.10+**.
 
-Since our experiments were performed on the **Marvin HPC cluster** at the University of Bonn, which uses **SLURM** for job scheduling, all major training runs were launched via the provided **bash scripts**. Each bash script corresponds to its respective Python training script and can be found in the `/Scripts` folder.
+Since our experiments were performed on the **Marvin HPC cluster** at the University of Bonn, which uses **SLURM** for job scheduling, all major training runs were launched via the provided **bash scripts**, which can be found in the `/Scripts` folder.
 
 ## Steps to Reproduce
 
@@ -317,5 +317,6 @@ This is handled automatically when you launch with ```torchrun```.
 Scaling DDP to larger models like MiniGPT, combining DDP with model parallelism.
 
 --- 
-Author: Ayushya Pare (Research assistant, University of Bonn)
-
+Contributions: 
+- Ayushya Pare (Research assistant, University of Bonn)
+- Junaid Mir (Research assistant, University Duisburg-Essen)
