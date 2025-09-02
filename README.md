@@ -6,5 +6,3 @@ It contains multiple guides, such as Distributed Data Parallel (DDP) with PyTorc
 ### Available Guides 
 [**DDP Guide**](DDP/) : Training a CNN on FashionMNIST using PyTorch Distributed Data Parallel (DDP) on HPC.
 
-### Contributors
-- Ayushya Pare - University of Bonn
