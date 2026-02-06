@@ -1,18 +1,20 @@
 
-import os, time
-import torch
-import torch.distributed as dist
-import torch.nn as nn
-import torch.optim as optim
-import torch.multiprocessing as mp
-import socket
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
-from cnn_model import CNN_MNIST
+import os, time  
+import torch  
+import torch.distributed as dist  # Distributed training
+import torch.nn as nn  # Neural network modules
+import torch.optim as optim  # Optimizers
+import torch.multiprocessing as mp  # Multiprocessing for DDP
+import socket  # For hostname info
+from torch.nn.parallel import DistributedDataParallel as DDP  # DDP wrapper
+from torchvision import datasets, transforms  # Datasets and transforms
+from torch.utils.data import DataLoader  # Data loading
+from torch.utils.data.distributed import DistributedSampler  # Distributed sampling
+from cnn_model import CNN_MNIST  # Custom CNN model
 
-# ---------- Device header ----------
+###############################
+# Device setup and info
+###############################
             
 def get_device(rank, world_size):
     if rank == 0:
@@ -31,7 +33,9 @@ def get_device(rank, world_size):
         else:
             print("[Device] CUDA not available — using CPU")
 
-# ---------- DDP setup / teardown ----------
+###############################
+# DDP setup and teardown
+###############################
 # Setup Port and address environment
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -42,7 +46,9 @@ def cleanup():
     dist.destroy_process_group()
     
 
-# ---------- Training (per-rank) ----------
+###############################
+# Training loop (per-rank)
+###############################
 def train_mnist(rank, world_size, epochs=15, batch_size=64):
     device = get_device(rank, world_size)
     
@@ -115,7 +121,9 @@ def train_mnist(rank, world_size, epochs=15, batch_size=64):
 
     cleanup()
 
-# ---------- Main ----------
+###############################
+# Main entry point
+###############################
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     assert world_size >= 2, f"Requires at least 2 GPUs to run, but got {world_size}"
